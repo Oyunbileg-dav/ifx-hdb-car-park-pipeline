@@ -76,7 +76,7 @@ def transform_carpark_info(raw_data):
     return records
 
 def transform_carpark_availability_6pm_historical(raw_data):
-    """Transform historical carpark availability data for 6pm analysis, filtering out records older than 30 days"""
+    """Transform historical carpark availability data for 6pm analysis, filtering out records older than 30 days and not within 1 hour of 6pm"""
     items = raw_data.get('items', [])
     if not items:
         print("No historical 6pm availability data to transform")
@@ -89,6 +89,7 @@ def transform_carpark_availability_6pm_historical(raw_data):
     cutoff_time = ingest_ts - timedelta(days=30)
     
     old_count = 0
+    non_6pm_count = 0
     
     for item in items:
         carpark_data = item.get('carpark_data', [])
@@ -109,6 +110,12 @@ def transform_carpark_availability_6pm_historical(raw_data):
                 # Skip if data is older than 30 days
                 if update_datetime < cutoff_time:
                     old_count += len(carpark_data)
+                    continue
+                
+                # Skip if timestamp is not within 1 hour of 6pm (between 5pm-7pm)
+                hour = update_datetime.hour
+                if hour < 17 or hour >= 19:  # Not between 5pm (17:00) and 7pm (19:00)
+                    non_6pm_count += len(carpark_data)
                     continue
             else:
                 # Skip records without timestamp
@@ -138,5 +145,7 @@ def transform_carpark_availability_6pm_historical(raw_data):
     print(f"Transformed {len(records)} historical 6pm availability records")
     if old_count > 0:
         print(f"Filtered out {old_count} records older than 30 days")
+    if non_6pm_count > 0:
+        print(f"Filtered out {non_6pm_count} records not within 6pm ±1 hour (5pm-7pm)")
     
     return records
