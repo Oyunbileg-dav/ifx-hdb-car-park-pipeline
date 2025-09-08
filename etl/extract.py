@@ -73,7 +73,7 @@ def fetch_carpark_availability_6pm_historical():
     
     # Determine which dates we need to fetch
     dates_to_fetch = []
-    for days_back in range(30):
+    for days_back in range(1, 31):
         target_date = today - timedelta(days=days_back)
         target_date_only = target_date.date()
         
@@ -135,7 +135,7 @@ def fetch_carpark_availability_6pm_historical_full():
     
     print(f"📅 Today's date in Singapore: {today.strftime('%Y-%m-%d')}")
     
-    for days_back in range(30):
+    for days_back in range(1, 31):
         target_date = today - timedelta(days=days_back)
         target_datetime = target_date.replace(hour=18, minute=0, second=0, microsecond=0)
         datetime_param = target_datetime.strftime('%Y-%m-%dT%H:%M:%S')

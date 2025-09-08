@@ -519,10 +519,11 @@ def generate_occupancy_report_html(occupied_lots, total_lots, available_lots, oc
                             "How many HDB carpark lots are currently occupied?"
                         </p>
                         <p style="margin: 10px 0 0 0; color: #6c757d; font-size: 0.95em;">
-                            This analysis includes all electronic parking systems with real-time availability data, 
-                            filtering out only stale data (&gt;10 hours old) to provide comprehensive occupancy 
-                            insights covering carparks of all sizes for complete capacity planning and utilization analysis.
-                            The visualization shows the relative distribution and availability across carparks.
+                            <strong>Answer:</strong> Currently, {occupied_lots:,} HDB carpark lots are occupied 
+                            out of {total_lots:,} total lots, representing an overall occupancy rate of 
+                            {occupancy_rate:.1f}%. The interactive map shows real-time availability across all 
+                            HDB carparks, with bubble sizes indicating total capacity and colors representing current occupancy levels. 
+                            This provides immediate visibility into parking availability for residents and visitors across Singapore.
                         </p>
                     </div>
                 </div>

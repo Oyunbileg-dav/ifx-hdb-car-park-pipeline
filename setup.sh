@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # IFX HDB Carpark Pipeline Setup Script
-# This script helps you set up the pipeline on any device
 
 set -e  # Exit on any error
 
@@ -33,7 +32,15 @@ echo "✅ Prerequisites check passed"
 # Create virtual environment if it doesn't exist
 if [ ! -d "venv" ]; then
     echo "📦 Creating virtual environment..."
-    python3 -m venv venv
+    
+    # Try Python 3.10 first, fallback to python3
+    if command -v python3.10 &> /dev/null; then
+        echo "🐍 Using Python 3.10"
+        python3.10 -m venv venv
+    else
+        echo "🐍 Using default Python 3"
+        python3 -m venv venv
+    fi
 fi
 
 # Activate virtual environment
@@ -76,10 +83,14 @@ make init
 echo ""
 echo "🎉 Setup complete! You can now run the pipeline:"
 echo ""
-echo "   make run          # Run the complete pipeline"
-echo "   make logs         # View database logs"
-echo "   make clean-db     # Clear all data"
-echo "   make down         # Stop the database"
+echo "   make run                       # Run the complete pipeline"
+echo "   make run-current               # Run current occupancy analysis only"
+echo "   make run-historical            # Run historical 6pm analysis only"
+echo "   make run-historical-full       # Run historical 6pm analysis with full data refresh"
+echo "   make logs                      # View database logs"
+echo "   make clean-db                  # Clear all data"
+echo "   make clean                     # Clean the reports"
+echo "   make down                      # Stop the database"
 echo ""
 echo "📊 Access database via Adminer: http://localhost:8080"
 echo "   System: PostgreSQL, Server: db, User: ifx, Password: ifx, Database: ifx"

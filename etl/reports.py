@@ -69,7 +69,7 @@ def get_6pm_high_utilization_carparks():
               AND hist.available_lots IS NOT NULL
               AND hist.total_lots > 0
               AND info.type_of_parking_system = 'ELECTRONIC PARKING'
-              AND hist.update_datetime_sg >= DATE_TRUNC('month', CURRENT_DATE)  -- This month only
+              AND hist.update_datetime_sg >= CURRENT_DATE - INTERVAL '30 days'  -- Last 30 days
             GROUP BY hist.carpark_number, info.address
         )
         SELECT 
@@ -105,7 +105,7 @@ def get_6pm_high_utilization_carparks():
               AND hist.available_lots IS NOT NULL
               AND hist.total_lots > 0
               AND info.type_of_parking_system = 'ELECTRONIC PARKING'
-              AND hist.update_datetime_sg >= DATE_TRUNC('month', CURRENT_DATE)
+              AND hist.update_datetime_sg >= CURRENT_DATE - INTERVAL '30 days'
             GROUP BY hist.carpark_number, info.address
         )
         SELECT 
@@ -129,3 +129,122 @@ def get_6pm_high_utilization_carparks():
         print(detail_df)
         
         return df, detail_df
+
+def get_6pm_scatterplot_data():
+    """Get data for scatterplot: total_lots vs avg_utilization_percent for all electronic carparks"""
+    print("Getting scatterplot data for 6pm analysis...")
+    
+    with get_conn() as conn:
+        query = """
+        WITH carpark_6pm_utilization AS (
+            SELECT 
+                hist.carpark_number,
+                info.address,
+                AVG(
+                    CASE 
+                        WHEN hist.total_lots > 0 
+                        THEN ((hist.total_lots - hist.available_lots)::numeric / hist.total_lots * 100)
+                        ELSE 0 
+                    END
+                ) as avg_utilization_percent,
+                COUNT(*) as data_points,
+                AVG(hist.total_lots) as avg_total_lots,
+                AVG(hist.available_lots) as avg_available_lots
+            FROM raw_carpark_availability_6pm_last_30days hist
+            INNER JOIN ref_carpark_info info ON hist.carpark_number = info.car_park_no
+            WHERE hist.total_lots IS NOT NULL 
+              AND hist.available_lots IS NOT NULL
+              AND hist.total_lots > 0
+              AND info.type_of_parking_system = 'ELECTRONIC PARKING'
+              AND hist.update_datetime_sg >= CURRENT_DATE - INTERVAL '30 days'
+            GROUP BY hist.carpark_number, info.address
+        )
+        SELECT 
+            carpark_number,
+            address,
+            ROUND(avg_utilization_percent, 2) as avg_utilization_percent,
+            ROUND(avg_total_lots, 0) as avg_total_lots,
+            data_points
+        FROM carpark_6pm_utilization
+        ORDER BY avg_total_lots ASC
+        """
+        
+        df = pd.read_sql(query, conn)
+        print(f"Scatterplot data retrieved: {len(df)} carparks")
+        return df
+
+def get_6pm_capacity_buckets():
+    """Get top 10 carparks by utilization for different capacity buckets"""
+    print("Getting capacity bucket analysis for 6pm...")
+    
+    with get_conn() as conn:
+        query = """
+        WITH carpark_6pm_utilization AS (
+            SELECT 
+                hist.carpark_number,
+                info.address,
+                AVG(
+                    CASE 
+                        WHEN hist.total_lots > 0 
+                        THEN ((hist.total_lots - hist.available_lots)::numeric / hist.total_lots * 100)
+                        ELSE 0 
+                    END
+                ) as avg_utilization_percent,
+                COUNT(*) as data_points,
+                AVG(hist.total_lots) as avg_total_lots
+            FROM raw_carpark_availability_6pm_last_30days hist
+            INNER JOIN ref_carpark_info info ON hist.carpark_number = info.car_park_no
+            WHERE hist.total_lots IS NOT NULL 
+              AND hist.available_lots IS NOT NULL
+              AND hist.total_lots > 0
+              AND info.type_of_parking_system = 'ELECTRONIC PARKING'
+              AND hist.update_datetime_sg >= CURRENT_DATE - INTERVAL '30 days'
+            GROUP BY hist.carpark_number, info.address
+        ),
+        bucketed_data AS (
+            SELECT 
+                carpark_number,
+                address,
+                ROUND(avg_utilization_percent, 2) as avg_utilization_percent,
+                ROUND(avg_total_lots, 0) as avg_total_lots,
+                data_points,
+                CASE 
+                    WHEN avg_total_lots <= 10 THEN 'Small (1-10 lots)'
+                    WHEN avg_total_lots <= 50 THEN 'Medium (11-50 lots)'
+                    WHEN avg_total_lots <= 100 THEN 'Large (51-100 lots)'
+                    ELSE 'Very Large (100+ lots)'
+                END as capacity_bucket
+            FROM carpark_6pm_utilization
+        )
+        SELECT 
+            capacity_bucket,
+            carpark_number,
+            address,
+            avg_utilization_percent,
+            avg_total_lots,
+            data_points
+        FROM (
+            SELECT 
+                capacity_bucket,
+                carpark_number,
+                address,
+                avg_utilization_percent,
+                avg_total_lots,
+                data_points,
+                ROW_NUMBER() OVER (PARTITION BY capacity_bucket ORDER BY avg_utilization_percent DESC) as rank_in_bucket
+            FROM bucketed_data
+        ) ranked_data
+        WHERE rank_in_bucket <= 10
+        ORDER BY 
+            CASE capacity_bucket 
+                WHEN 'Small (1-10 lots)' THEN 1
+                WHEN 'Medium (11-50 lots)' THEN 2
+                WHEN 'Large (51-100 lots)' THEN 3
+                WHEN 'Very Large (100+ lots)' THEN 4
+            END,
+            avg_utilization_percent DESC
+        """
+        
+        df = pd.read_sql(query, conn)
+        print(f"Capacity bucket analysis completed: {len(df)} records")
+        return df

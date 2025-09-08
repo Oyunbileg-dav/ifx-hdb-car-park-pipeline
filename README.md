@@ -1,19 +1,22 @@
 # IFX HDB Carpark Pipeline
 
-A data pipeline for analyzing Singapore HDB carpark availability data using Python, SQL, Prefect, and PostgreSQL.
+A comprehensive data pipeline for analyzing Singapore HDB carpark availability data using Python, SQL, Prefect, and PostgreSQL. This pipeline answers two key business questions about HDB parking utilization.
 
 ## Features
 
-- **Real-time Data**: Fetches current carpark availability from Singapore's data.gov.sg API
-- **Historical Analysis**: Collects and analyzes 6pm availability data for trend analysis
-- **Electronic Parking Focus**: Filters data to include only carparks with electronic parking systems
+- **Real-time Analysis**: Fetches current carpark availability with interactive map visualization
+- **Historical 6pm Analysis**: Analyzes 30-day historical data for peak hour utilization patterns
+- **Interactive HTML Reports**: Generates beautiful, responsive reports with charts and maps
+- **Delta Loading**: Optimized data fetching that only retrieves new data
 - **Singapore Time**: All timestamps stored and processed in Singapore Time (SGT)
-- **Automated Pipeline**: Uses Prefect for workflow orchestration
+- **Automated Pipeline**: Uses Prefect for workflow orchestration with separate flows
 - **Data Quality**: Filters stale records and handles missing data gracefully
+- **Search Functionality**: Interactive search by address or carpark number
+- **Capacity Analysis**: Bucketed analysis by carpark size (Small, Medium, Large, Very Large)
 
 ## Prerequisites
 
-- **Python 3.8+**
+- **Python 3.8+ (Python 3.10+ recommended)**
 - **Docker & Docker Compose** (for database)
 - **Git** (for version control)
 
@@ -67,13 +70,26 @@ make init
 ### 4. Run the Pipeline
 
 ```bash
-# Run the complete data pipeline
-make run
+# Run current occupancy analysis (with interactive map)
+make run-current
+
+# Run historical 6pm analysis (with scatterplot and capacity buckets)
+make run-historical
+
+# Run historical analysis with full data refresh
+make run-historical-full
+
+# Run both analyses
+make run-all
 ```
 
 ### 5. View Results
 
 ```bash
+# View HTML reports (generated automatically)
+open reports/current_occupancy_report.html    # Current occupancy with interactive map
+open reports/historical_6pm_report.html       # Historical analysis with scatterplot
+
 # Access database via Adminer (web interface)
 # URL: http://localhost:8080
 # System: PostgreSQL
@@ -102,7 +118,14 @@ PYTHONPATH=. python scripts/init_db.py
 
 ### Run Pipeline
 ```bash
-PYTHONPATH=. python flows/pipeline.py
+# Current occupancy analysis
+PYTHONPATH=. python flows/current_occupancy_pipeline.py
+
+# Historical 6pm analysis
+PYTHONPATH=. python flows/historical_6pm_pipeline.py
+
+# Historical analysis with full refresh
+PYTHONPATH=. python flows/historical_6pm_pipeline.py full
 ```
 
 ## Project Structure
@@ -113,10 +136,15 @@ ifx-hdb-pipeline/
 │   ├── extract.py         # Data extraction from APIs
 │   ├── transform.py       # Data transformation logic
 │   ├── load.py           # Database loading functions
-│   ├── reports.py        # Analysis and reporting
+│   ├── reports.py        # Analysis and reporting functions
 │   └── db.py             # Database connection utilities
 ├── flows/                 # Prefect workflow definitions
-│   └── pipeline.py       # Main pipeline orchestration
+│   ├── current_occupancy_pipeline.py    # Real-time analysis with map
+│   ├── historical_6pm_pipeline.py       # Historical 6pm analysis
+│   └── pipeline.py       # Legacy pipeline (deprecated)
+├── reports/               # Generated HTML reports
+│   ├── current_occupancy_report.html    # Current occupancy report
+│   └── historical_6pm_report.html      # Historical analysis report
 ├── sql/                  # Database schema
 │   └── 001_schema.sql    # Table definitions
 ├── scripts/              # Utility scripts
@@ -124,8 +152,33 @@ ifx-hdb-pipeline/
 ├── docker-compose.yml    # PostgreSQL database setup
 ├── Makefile             # Common commands
 ├── requirements.txt     # Python dependencies
+├── setup.sh            # Automated setup script
 └── README.md           # This file
 ```
+
+## Business Questions Answered
+
+The pipeline addresses two key business questions:
+
+### 1. Current Occupancy Analysis
+**Question**: "How many HDB carpark lots are currently occupied?"
+
+**Features**:
+- Real-time data collection from Singapore's data.gov.sg API
+- Interactive map visualization with Leaflet.js
+- Search functionality by address or carpark number
+- Bubble sizes represent total capacity, colors show occupancy levels
+- Covers all HDB carparks (not just electronic)
+
+### 2. Historical 6pm Analysis
+**Question**: "How many HDB carparks with electronic parking are utilised at ≥80% capacity on average at approximately 6pm this month?"
+
+**Features**:
+- 30-day historical data analysis
+- Interactive scatterplot (capacity vs utilization)
+- Capacity-bucketed analysis (Small, Medium, Large, Very Large)
+- Focuses on electronic parking systems only
+- Delta loading for efficient data updates
 
 ## Pipeline Overview
 
@@ -135,18 +188,20 @@ The pipeline consists of three main stages:
 - **Current Availability**: Fetches real-time carpark data
 - **Carpark Info**: Downloads reference data about carpark locations and systems
 - **Historical 6pm Data**: Collects availability data from the past 30 days at 6pm SGT
+- **Delta Loading**: Only fetches new data to optimize performance
 
 ### 2. Transform
 - **Data Cleaning**: Removes invalid or incomplete records
 - **Timezone Handling**: Converts all timestamps to Singapore Time
 - **Age Filtering**: Filters out stale data (>10 hours for current, >30 days for historical)
+- **Time Window Filtering**: Historical data filtered to 6pm ±1 hour (5pm-7pm SGT)
 - **Data Validation**: Ensures data quality and consistency
 
 ### 3. Load
 - **Current Data**: Loads into `raw_carpark_current_availability` table
 - **Reference Data**: Updates `ref_carpark_info` table
 - **Historical Data**: Loads into `raw_carpark_availability_6pm_last_30days` table
-- **Conflict Resolution**: Handles duplicate records gracefully
+- **Conflict Resolution**: Handles duplicate records gracefully with upsert operations
 
 ## Database Schema
 
@@ -164,12 +219,31 @@ The pipeline consists of three main stages:
    - Historical availability data for trend analysis
    - Focuses on 6pm data for consistent comparison
 
+## HTML Reports
+
+The pipeline automatically generates interactive HTML reports:
+
+### Current Occupancy Report (`reports/current_occupancy_report.html`)
+- **Real-time metrics**: Occupied lots, total lots, availability
+- **Interactive map**: Leaflet.js visualization with zoom and pan
+- **Search functionality**: Find carparks by address or number
+- **Visual indicators**: Bubble sizes (capacity) and colors (occupancy)
+- **Responsive design**: Works on desktop and mobile
+
+### Historical 6pm Report (`reports/historical_6pm_report.html`)
+- **Summary statistics**: High utilization counts and averages
+- **Interactive scatterplot**: Chart.js visualization (capacity vs utilization)
+- **Capacity buckets**: Top performers by size category
+- **Detailed tables**: Comprehensive data breakdowns
+- **Business question answer**: Complete analysis explanation
+
 ## Configuration
 
 ### Data Retention
 - **Current Data**: Filters records older than 10 hours
 - **Historical Data**: Keeps data from the last 30 days
-- **Electronic Parking Only**: Filters to include only electronic parking systems
+- **Electronic Parking**: Historical analysis focuses on electronic parking systems only
+- **All Carparks**: Current occupancy analysis includes all HDB carparks
 
 ### API Settings
 The pipeline uses Singapore's official data.gov.sg APIs:
@@ -228,6 +302,8 @@ The pipeline uses Singapore's official data.gov.sg APIs:
 2. **Data Transformations**: Extend `etl/transform.py`
 3. **Database Changes**: Update `sql/001_schema.sql` and run `make init`
 4. **Analysis**: Add new functions to `etl/reports.py`
+5. **New Pipelines**: Create new flow files in `flows/` directory
+6. **Report Generation**: Add HTML report functions to pipeline flows
 
 ### Testing
 
