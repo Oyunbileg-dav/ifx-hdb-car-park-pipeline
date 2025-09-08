@@ -69,7 +69,7 @@ def get_6pm_high_utilization_carparks():
               AND hist.available_lots IS NOT NULL
               AND hist.total_lots > 0
               AND info.type_of_parking_system = 'ELECTRONIC PARKING'
-              AND hist.update_datetime_sg >= CURRENT_DATE - INTERVAL '30 days'  -- Last 30 days
+              AND hist.update_datetime_sg >= CURRENT_DATE - INTERVAL '30 days' -- DATE_TRUNC('month', CURRENT_DATE) if this month only
             GROUP BY hist.carpark_number, info.address
         )
         SELECT 
