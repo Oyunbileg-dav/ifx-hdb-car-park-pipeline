@@ -80,7 +80,7 @@ make run-historical
 make run-historical-full
 
 # Run both analyses
-make run-all
+make run
 ```
 
 ### 5. View Results
